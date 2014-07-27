@@ -61,7 +61,10 @@ class PushQueueHandler(object):
         queue_args = self._pop_tq_add_args(kwargs)
         app = queue_args.pop('app', None) or flask.current_app
 
-        with app.app_context():
+        with app.test_request_context():
+            # flask.url_for uses the request context if it is present
+            # as we're most likely in a request context, use a
+            # test_request_context() instead.
             url = self.url()
 
         payload = pickle.dumps((args, kwargs))
