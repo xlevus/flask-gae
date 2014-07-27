@@ -18,7 +18,8 @@ Example ::
         do_stuff_with(b)
         do_stuff_with(c)
 
-    my_task_queue.queue(1, 2, 3)  # Queue my_queue_handler to be called with the args (1, 2, 3)
+    # Queue my_queue_handler to be called with the args (1, 2, 3)
+    my_task_queue.queue(1, 2, 3)  
 
 
 *Note* You can not call `my_queue_handler` directly. You must call `my_queue_hander.func` instead.

@@ -58,6 +58,16 @@ class PushQueueHandler(object):
         return "View completed successfully"
 
     def queue(self, *args, **kwargs):
+        """
+        Enqueue the function to be called with the given args and keyword
+        arguments.
+
+        :param _app: The optional application to use for routing.
+        :param _eta: The ETA for the task
+        :param _transactional: Enqueue the task in a transaction.
+        :param _target: The target version/module to run the task on
+        :param _name: The task name.
+        """
         queue_args = self._pop_tq_add_args(kwargs)
         app = queue_args.pop('app', None) or flask.current_app
 
@@ -77,6 +87,10 @@ class PushQueueHandler(object):
         )
 
     def _pop_tq_add_args(self, kwargs):
+        """
+        Extract the arguments for the taskqueue.add out of the original
+        keyword arguments.
+        """
         return {
             x: kwargs.pop('_' + x, None) for x in self.QUEUE_ARGS
         }

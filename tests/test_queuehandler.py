@@ -86,12 +86,13 @@ class PushQueueViewTestCase(TestCase):
 
     @mock.patch('google.appengine.api.taskqueue.add')
     def test_queue(self, tq_add):
+        payload = pickle.dumps(((1, 2, 3), {'kw': 'arg'}))
         self.view.queue(1, 2, 3, kw='arg')
 
         tq_add.assert_called_once_with(
             url='/testhandler/',
             queue_name='testqueue',
-            payload=mock.ANY,
+            payload=payload,
             transactional=None,
             eta=None,
             target=None,
