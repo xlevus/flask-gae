@@ -2,7 +2,7 @@ from flask_testing import TestCase as FTTestCase
 
 try:
     import cloudstorage as gcs
-except gcs:
+except ImportError:
     gcs = None
 
 from google.appengine.ext import testbed

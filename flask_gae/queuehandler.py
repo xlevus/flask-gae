@@ -18,11 +18,16 @@ def task_retry_count():
 
 
 class PushQueueHandler(object):
+    """
+    A decorator to turn a view into an AppEngine push-queue handler.
+
+    :param queue_name: The queue name to enqueue jobs for this handler on.
+    """
+
     QUEUE_ARGS = ['app', 'eta', 'name', 'target', 'transactional']
 
-    def __init__(self, queue_name='default', logger=None):
+    def __init__(self, queue_name='default'):
         self.queue_name = queue_name
-        self.logger = logger or logging.getLogger(__name__)
         self.func = None
 
     def __call__(self, func=None):
@@ -31,6 +36,7 @@ class PushQueueHandler(object):
             self.__name__ = func.__name__
             self.__doc__ = func.__doc__
             self.__module__ = func.__module__
+            self.logger = logging.getLogger(func.__module__)
 
             return self
         return self._request_handler()

@@ -11,6 +11,11 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+.. module:: flask.ext.gae
+
+.. autofunction:: send_gcs_file
+
+.. autofunction:: pushqueue
 
 
 Indices and tables

@@ -11,13 +11,25 @@ logger = logging.getLogger(__name__)
 def send_gcs_file(filename, bucket=None, mimetype=None, add_etags=True,
                   as_attachment=False, attachment_filename=None):
     """
-    Serve a file in Google Cloud Storage to the client.
+    Serve a file in Google Cloud Storage (gcs) to the client.
 
-    :param filename: The filepath to serve.
-    :param bucket: The GCS bucket.
+    :param filename: The filepath to serve from gcs.
+
+    :param bucket: The GCS bucket. If `None`, the default gcs bucket name will
+        be used
+
     :param mimetype: The mimetype to serve the file as. If not provided
-        the mimetype as recorded by GCS will be used.
-    :param add_etags: If true, etags as provided by GCS will be added.
+        the mimetype as recorded by gcs will be used. The gcs default for
+        unknown files is `application/octet-stream`.
+
+    :param add_etags: If `True`, etags as provided by gcs will be added.
+
+    :param as_attachment: set to `True` if you want to send this file with a
+        ``Content-Disposition: attachment`` header.
+    :param attachment_filename: the filename for the attachment if it differs
+        from the file's filename.
+
+    :returns: A :class:`flask.Response` object.
     """
     try:
 
