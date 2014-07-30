@@ -22,5 +22,5 @@ setup(
     keywords='flask wtforms appengine ndb',
     license='',
     test_suite='nose.collector',
-    tests_require=['nose', 'flask-testing', 'mock'],
+    tests_require=['nose', 'flask-testing', 'mock', 'GoogleAppEngineCloudStorageClient'],
 )
