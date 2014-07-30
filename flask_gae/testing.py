@@ -31,21 +31,15 @@ class TestCase(FTTestCase):
     STUBS = ['datastore_v3', 'memcache', 'app_identity', 'blobstore',
              'files', 'urlfetch']
 
-    datastore_stub = {
+    datastore_v3_stub = {
         'consistency_policy': PRHRConsistencyPolicy(probability=1)}
-    memcache_stub = True
-    app_identity_stub = True
-    memcache_stub = True
-    blobstore_stub = True
-    files_stub = True
-    urlfetch_stub = True
 
     def _pre_setup(self):
         self.testbed = testbed.Testbed()
         self.testbed.activate()
 
         for stub in self.STUBS:
-            stub_args = getattr(self, stub + '_stub', False)
+            stub_args = getattr(self, stub + '_stub', True)
             init = getattr(self.testbed, 'init_' + stub + '_stub')
 
             if isinstance(stub_args, dict):
