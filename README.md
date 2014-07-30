@@ -9,7 +9,7 @@ Flask-GAE provides a base TestCase class that sets up the testbed. By default al
 stubs are enabled, but they can be disabled with setting `STUBNAME_stub` to False.
 Arguments can be passed to stub initialisers by setting `STUBNAME_stub` to a dictionary.
 
-Example ::
+Example :
 
 ```python
 from flask.ext import gae
@@ -30,9 +30,9 @@ Task Queues
 
 There is a decorator to provide a simple flask friendly interface to the GAE task queues.
 
-Example ::
+Example :
 
-```
+```python
 import flask
 from flask.ext import gae
 
@@ -55,7 +55,7 @@ my_task_queue.queue(1, 2, 3)
 Cloud Storage API
 -----------------
 
-To serve Cloud Storage files ::
+To serve Cloud Storage files :
 
 ```python
 
