@@ -2,12 +2,10 @@ import cPickle as pickle
 import mock
 import flask
 
-from .base import TestCase
-
-from flask_gae.queuehandler import pushqueue
+from flask.ext import gae
 
 
-@pushqueue('testqueue')
+@gae.pushqueue('testqueue')
 def execute(*args, **kwargs):
     return "OK"
 
@@ -15,12 +13,12 @@ tq_bp = flask.Blueprint('test_blueprint', __name__)
 
 
 @tq_bp.route('/queue/')
-@pushqueue('testqueue')
+@gae.pushqueue('testqueue')
 def blueprint_task(a, b, c):
     return "OK"
 
 
-class PushQueueViewTestCase(TestCase):
+class PushQueueViewTestCase(gae.testing.TestCase):
     def setUp(self):
         execute_patch = mock.patch.object(execute, 'func')
         self.addCleanup(execute_patch.stop)
@@ -139,7 +137,7 @@ class PushQueueViewTestCase(TestCase):
         app2 = flask.Flask('other_guy')
 
         @app2.route('/foo/bar/baz/')
-        @pushqueue('other_queue')
+        @gae.pushqueue('other_queue')
         def other_app_handler():
             return "OK"
 
