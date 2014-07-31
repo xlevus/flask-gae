@@ -9,4 +9,7 @@ except ImportError:
 else:
     from .cloudstore import send_gcs_file
 
-from . import testing
+try:
+    from . import testing
+except ImportError:
+    pass

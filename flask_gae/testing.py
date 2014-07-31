@@ -75,6 +75,10 @@ class TestCase(FTTestCase):
         os.environ['USER_ID'] = user_id or ''
         os.environ['USER_IS_ADMIN'] = '1' if is_admin else '0'
 
+        if email or user_id or is_admin:
+            # Make sure we're logged out again at the end of the test.
+            self.addCleanup(self.logout_appengine_user)
+
     def logout_appengine_user(self):
         """
         Log an appengine user out. The opposite of
