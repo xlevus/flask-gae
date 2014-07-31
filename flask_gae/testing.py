@@ -62,6 +62,26 @@ class TestCase(FTTestCase):
 
         return gcs.stat(filename)
 
+    def login_appengine_user(self, email, user_id, is_admin=False):
+        """
+        Login a user for the :module:`google.appengine.api.users' service.
+
+        :param email: The users email address
+        :param user_id: The users's ID
+        :param is_admin: Is the user an admin
+        """
+        import os
+        os.environ['USER_EMAIL'] = email or ''
+        os.environ['USER_ID'] = user_id or ''
+        os.environ['USER_IS_ADMIN'] = '1' if is_admin else '0'
+
+    def logout_appengine_user(self):
+        """
+        Log an appengine user out. The opposite of
+        :func:`login_appengine_user`.
+        """
+        self.login_appengine_user(None, None)
+
     def assertBlobkey(self, resp, blobkey=None, filename=None, bucket=None):
         """
         Assert a response includes a serving blobkey.
