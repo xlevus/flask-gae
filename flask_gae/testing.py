@@ -5,6 +5,7 @@ try:
 except ImportError:
     gcs = None
 
+from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 from google.appengine.ext import blobstore
 from google.appengine.api import app_identity
@@ -85,6 +86,22 @@ class TestCase(FTTestCase):
         :func:`login_appengine_user`.
         """
         self.login_appengine_user(None, None)
+
+    def create_mock_future(self, contents=None, exception=None):
+        """
+        Create a mock future with a pre-filled value.
+
+        :param contents: The value held by the future. As retrieved by
+            :func:`ndb.Future.get_result()`
+        :param exception: The exception to be held by the future. As retrieved
+            by :func:`Future.get_exception()`
+        """
+        f = ndb.Future()
+        if exception:
+            f.set_exception(exception)
+        else:
+            f.set_result(contents)
+        return f
 
     def assertBlobkey(self, resp, blobkey=None, filename=None, bucket=None):
         """
