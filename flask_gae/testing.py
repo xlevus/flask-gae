@@ -14,6 +14,8 @@ from google.appengine.datastore.datastore_stub_util import \
 
 __all__ = ['TestCase']
 
+ndb.utils.DEBUG = False
+
 
 class Any(object):
     def __eq__(self, other):
