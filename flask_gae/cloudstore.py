@@ -95,7 +95,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
             resp.headers.add('Content-Disposition', 'attachment',
                              filename=attachment_filename)
 
-        if add_last_modified and stat.st_ctime:
+        if add_last_modified and (last_modified or stat.st_ctime):
             resp.last_modified = last_modified or int(stat.st_ctime)
 
         resp.headers[blobstore.BLOB_KEY_HEADER] = str(blobkey.get_result())
