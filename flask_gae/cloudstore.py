@@ -22,6 +22,15 @@ class LazyStat(object):
             self.data = gcs.stat(self.filename)
         return getattr(self.data, attr)
 
+DEFAULT_GCS_BUCKET = None
+
+
+def _default_bucket():
+    global DEFAULT_GCS_BUCKET
+    if DEFAULT_GCS_BUCKET is None:
+        DEFAULT_GCS_BUCKET = app_identity.get_default_gcs_bucket_name()
+    return DEFAULT_GCS_BUCKET
+
 
 def send_gcs_file(filename, bucket=None, mimetype=None,
                   add_etags=True, etags=None,
@@ -41,7 +50,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
     :param filename: The filepath to serve from gcs.
 
     :param bucket: The GCS bucket. If `None`, the default gcs bucket name will
-        be used
+        be used. *Note* The default bucket name will be cached in local memory.
 
     :param mimetype: The mimetype to serve the file as. If not provided
         the mimetype as recorded by gcs will be used. The gcs default for
@@ -63,7 +72,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
     """
     try:
 
-        bucket = bucket or app_identity.get_default_gcs_bucket_name()
+        bucket = bucket or _default_bucket()
         gcs_filename = '/{}/{}'.format(bucket, filename)
         blobkey = blobstore.create_gs_key_async('/gs' + gcs_filename)
 
