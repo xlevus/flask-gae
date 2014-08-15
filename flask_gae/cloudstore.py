@@ -73,7 +73,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
     try:
 
         bucket = bucket or _default_bucket()
-        gcs_filename = '/{}/{}'.format(bucket, filename)
+        gcs_filename = '/{}{}'.format(bucket, filename)
         blobkey = blobstore.create_gs_key_async('/gs' + gcs_filename)
 
         stat = LazyStat(gcs_filename)
@@ -90,7 +90,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
 
         if as_attachment:
             if attachment_filename is None:
-                attachment_filename = filename
+                attachment_filename = filename.split('/')[-1]
 
             resp.headers.add('Content-Disposition', 'attachment',
                              filename=attachment_filename)

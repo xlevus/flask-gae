@@ -12,7 +12,7 @@ class SendGCSTestCase(gae.testing.TestCase):
         @app.route('/<path:filename>')
         def index(filename):
             return gae.send_gcs_file(
-                filename,
+                '/'+filename,
                 bucket=flask.request.args.get('bucket', None),
                 mimetype=flask.request.args.get('mimetype', None),
                 add_etags=('noetag' not in flask.request.args),
