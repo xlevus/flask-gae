@@ -58,7 +58,7 @@ class TestCase(FTTestCase):
     def create_gcs_file(self, filename, data='', bucket=None,
                         mimetype=None):
         bucket = bucket or app_identity.get_default_gcs_bucket_name()
-        filename = '/{}/{}'.format(bucket, filename)
+        filename = '/{}{}'.format(bucket, filename)
 
         with gcs.open(filename, 'w', content_type=mimetype) as f:
             f.write(data)
@@ -117,13 +117,13 @@ class TestCase(FTTestCase):
 
         if not blobkey and filename:
             _test_gcs()
-            blobkey = blobstore.create_gs_key('/gs/{}/{}'.format(
+            blobkey = blobstore.create_gs_key('/gs/{}{}'.format(
                 bucket or app_identity.get_default_gcs_bucket_name(),
                 filename))
         elif not blobkey:
             blobkey = ANY
 
         self.assertEqual(
-            resp.headers[blobstore.BLOB_KEY_HEADER],
+            resp.headers.get(blobstore.BLOB_KEY_HEADER),
             blobkey)
 
