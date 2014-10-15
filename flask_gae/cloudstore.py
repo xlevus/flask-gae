@@ -81,7 +81,7 @@ def send_gcs_file(filename, bucket=None, mimetype=None,
         if mimetype is None:
             mimetype = stat.content_type
 
-        resp = flask.current_app.response_class('', mimetype=mimetype)
+        resp = flask.current_app.response_class('BLOB', mimetype=mimetype)
 
         resp.cache_control.public = True
 
