@@ -24,10 +24,10 @@ class SendGCSTestCase(gae.testing.TestCase):
         return app
 
     def test_get(self):
-        self.create_gcs_file('test.txt', mimetype='text/plain')
+        self.create_gcs_file('/test.txt', mimetype='text/plain')
 
         resp = self.client.get('/test.txt')
-        self.assertBlobkey(resp, filename='test.txt')
+        self.assertBlobkey(resp, filename='/test.txt')
         self.assertEqual(resp.mimetype, 'text/plain')
 
         # GCS seems to use non-utc values.
@@ -38,11 +38,11 @@ class SendGCSTestCase(gae.testing.TestCase):
         self.assertTrue(resp.cache_control.public)
 
     def test_alternate_bucket(self):
-        self.create_gcs_file('test.json', bucket='bucket_two',
+        self.create_gcs_file('/test.json', bucket='bucket_two',
                              mimetype='application/json')
 
         resp = self.client.get('/test.json?bucket=bucket_two')
-        self.assertBlobkey(resp, filename='test.json', bucket='bucket_two')
+        self.assertBlobkey(resp, filename='/test.json', bucket='bucket_two')
         self.assertEqual(resp.mimetype, 'application/json')
 
     def test_missing_file(self):
@@ -57,7 +57,7 @@ class SendGCSTestCase(gae.testing.TestCase):
         # self.assert404(resp2)
 
     def test_etags(self):
-        self.create_gcs_file('test.txt', mimetype='text/plain')
+        self.create_gcs_file('/test.txt', mimetype='text/plain')
 
         resp1 = self.client.get('/test.txt')
         # Etag of an empty file
@@ -68,7 +68,7 @@ class SendGCSTestCase(gae.testing.TestCase):
         self.assertIsNone(resp2.get_etag()[0])
 
     def test_attachment(self):
-        self.create_gcs_file('test.txt', mimetype='text/plain')
+        self.create_gcs_file('/test.txt', mimetype='text/plain')
 
         resp1 = self.client.get('/test.txt?attachment=1')
         self.assertEqual(resp1.headers['Content-Disposition'],
