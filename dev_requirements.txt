@@ -1,0 +1,8 @@
+git+https://github.com/xlevus/gae-setuptools.git 
+
+nose
+flask-testing
+mock
+GoogleAppEngineCloudStorageClient
+
+-r requirements.txt
