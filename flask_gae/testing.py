@@ -32,7 +32,7 @@ def _test_gcs():
 
 class TestCase(FTTestCase):
     STUBS = ['datastore_v3', 'memcache', 'app_identity', 'blobstore',
-             'files', 'urlfetch', 'user']
+             'files', 'urlfetch', 'user', 'channel']
 
     datastore_v3_stub = {
         'consistency_policy': PRHRConsistencyPolicy(probability=1)}
