@@ -1,6 +1,8 @@
 Flask-GAE
 =========
 
+[![Build Status](https://travis-ci.org/xlevus/flask-gae.svg)](https://travis-ci.org/xlevus/flask-gae)
+
 
 Testing
 -------
@@ -66,3 +68,35 @@ def serve_gcs_file(filename):
     return gae.send_gcs_file(filename)
 
 ```
+
+View Decorators
+---------------
+
+To make a view only accessible by Cron::
+
+    from flask.ext import gae
+
+    @app.route('/scheduled-task')
+    @gae.requires(gae.Cron)
+    def scheduled_task():
+        do_something()
+        return "Done"
+
+Or, also allow application administrators ::
+
+    @app.route('/other-scheduled-task')
+    @gae.requires(gae.Cron | gae.Administrator)
+    def other_scheduled_task():
+        do_something()
+        return "Done"
+
+"""
+
+Available tests:
+
+    * ``gae.Cron`` - Cron tasks
+    * ``gae.TaskQueue(*queue_names)`` - Restrict view to TaskQueue calls.
+    * ``gae.User`` - Restrict view to authenticated users via `google.appengine.api.users`
+    * ``gae.Administrator`` - Restrict view to application administrators
+    * ``gae.InboundApplication(*application_ids)`` - Restrict view to inbound AppEngine calls only. By default, will limit calls to the current application only.
+
