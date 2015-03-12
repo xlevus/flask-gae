@@ -1,7 +1,12 @@
 import logging
 import cPickle as pickle
+from functools import update_wrapper
 
+from google.appengine.ext import ndb
 from google.appengine.api import taskqueue
+from google.appengine.api import app_identity
+from google.appengine.api import urlfetch
+from google.appengine.api.background_thread import start_new_background_thread
 
 import flask
 
@@ -110,3 +115,173 @@ class PushQueueHandler(object):
 
 pushqueue = PushQueueHandler
 
+
+class _PullWorkerLock(ndb.Model):
+    count = ndb.IntegerProperty(default=0)
+
+    @classmethod
+    @ndb.transactional
+    def acquire(cls, id, max_workers=1):
+        inst = cls.get_or_insert(id)
+        if inst.count >= max_workers:
+            return False
+
+        inst.count += 1
+        inst.put()
+        return inst
+
+    @ndb.transactional
+    def release(self):
+        self.count -= 1
+        self.put()
+
+
+class PullQueueHandler(object):
+    """
+    View class to provide a wrapper around a pull queue worker.
+
+    Only one worker thread will run at a time, and will continue to
+    lease tasks until it is leased no more. At that point, the worker
+    must be started again. This can be done in one of two ways:
+
+        1. Not yet implemented.
+
+        2. Use a cron job to call the pull worker periodically.
+
+    The worker (decorated) function *must* yield each completed task.
+    These will be deleted from the queue. Any tasks that are not yielded
+    will remain on the queue to be re-leased later.
+
+    :param queue_name: Queue to push tasks to/pull tasks from
+    :param module_name: Module to run the pull worker on.
+    :param lease_seconds: Time to lease tasks for.
+    :param lease_size: Number of tasks to lease per pull.
+
+    Usage ::
+
+        app = flask.Flask('pullworker')
+
+        @app.route('/myworker')  # Calling this URL will start the worker.
+        @PullWorker('myworker', 'mymodule', 60, 500, spawn_delay=60)
+        def myworker(rows):
+            tasks, datas = zip(*rows)  # Unzip tasks and rows
+            for data in datas:
+                do_stuff(data)
+            yield tasks  # You can yield either a single or iterable of tasks
+
+        myworker.push({'some': 'data'})
+        myworker.push({'foo': 'bar'})
+        myworker.push({'baz': 'qux'}, eta=sometime_in_the_future)
+        myworker.push({'more': 'than'}, {'one': 'payload'})
+    """
+
+    #: Module or class that provides dumps/loads functionality. Default
+    #: is cPickle.
+    serializer = pickle
+
+    def __init__(self, queue_name, module_name, lease_seconds=600,
+                 lease_size=100):
+        self.func = None
+
+        self.queue_name = queue_name
+        self.module_name = module_name
+        self.lease_seconds = lease_seconds
+        self.lease_size = lease_size
+
+    @property
+    def queue(self):
+        return taskqueue.Queue(self.queue_name)
+
+    def __call__(self, func=None):
+        if self.func is None:
+            self.func = func
+            self.logger = logging.getLogger(func.__module__)
+            update_wrapper(self, func)
+            return self
+        return self._start()
+
+    def _start(self):
+        start_new_background_thread(self._pull, ())
+        return "Started"
+
+    def _pull(self):
+        lock = _PullWorkerLock.acquire(self.queue.name)
+        if lock is False:
+            return "locked"
+
+        try:
+            while True:
+                tasks = self.queue.lease_tasks(self.lease_seconds,
+                                               self.lease_size)
+                self.logger.debug("Leased %i tasks.", len(tasks))
+                if len(tasks) == 0:
+                    self.logger.debug("Finishing")
+                    return
+
+                completed = []
+                output, _ = self._deserialize(tasks)
+
+                try:
+                    for success in self.func(output):
+                        # Iter the function, and try to extend the completed
+                        # tasks
+                        try:
+                            completed.extend(success)
+                        except TypeError:
+                            # Somebody yielded a single task. Append it
+                            completed.append(success)
+                finally:
+                    self.queue.delete_tasks(completed)
+
+        finally:
+            lock.release()
+
+    def _deserialize(self, tasks):
+        output = []
+        errors = []
+        for t in tasks:
+            try:
+                output.append((t, self.serializer.loads(t.payload)))
+            except ValueError:
+                errors.append(t)
+        return output, errors
+
+    def push(self, *payloads, **task_args):
+        """
+        Push data onto the queue. Each argument is pushed to the queue as a
+        new task.
+        """
+        tasks = [taskqueue.Task(payload=self.serializer.dumps(p),
+                                method='PULL',
+                                **task_args)
+                 for p in payloads]
+        self.queue.add(tasks)
+
+    def start(self, module=None, app=None):
+        """
+        Attempt to start processing the pull queue.
+
+        :param module: The module to start the task on. If unspecified
+            will default to the module_name as provided in the init method.
+
+        :param app: The flask.Flask app to build the URL off. If unspecified
+            will use the current app.
+        """
+        with (app or flask.current_app).test_request_context():
+            path = self.url()
+
+        url = 'https://{module}-dot-{hostname}{path}'.format(
+            module=module or self.module_name,
+            hostname=app_identity.get_default_version_hostname(),
+            path=path)
+
+        urlfetch.fetch(url)
+
+    def url(self):
+        for endpoint, function in flask.current_app.view_functions.iteritems():
+            if self is function:
+                return flask.url_for(endpoint)
+        raise RuntimeError("Unable to find the endpoint name")
+
+
+pullqueue = PullQueueHandler

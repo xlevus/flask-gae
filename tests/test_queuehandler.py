@@ -1,8 +1,11 @@
+import os
 import cPickle as pickle
 import mock
 import flask
+from google.appengine.api import taskqueue
 
 from flask.ext import gae
+from flask.ext.gae import queuehandler
 
 
 @gae.pushqueue('testqueue')
@@ -16,6 +19,17 @@ tq_bp = flask.Blueprint('test_blueprint', __name__)
 @gae.pushqueue('testqueue')
 def blueprint_task(a, b, c):
     return "OK"
+
+
+ROW_WORKER = mock.MagicMock()
+
+
+@tq_bp.route('/worker')
+@gae.pullqueue('pullqueue', 'module', 123, 50)
+def worker(rows):
+    for task, data in rows:
+        ROW_WORKER(data)
+        yield task
 
 
 class PushQueueViewTestCase(gae.testing.TestCase):
@@ -80,7 +94,7 @@ class PushQueueViewTestCase(gae.testing.TestCase):
         self.execute.side_effect = NotImplementedError()
 
         resp = self.make_request(1, 2, 3, kw='arg')
-        self.assert500(resp)
+        self.assertEqual(resp.status_code, 500)
 
     @mock.patch('google.appengine.api.taskqueue.add')
     def test_queue(self, tq_add):
@@ -151,3 +165,85 @@ class PushQueueViewTestCase(gae.testing.TestCase):
             target=None,
             name=None,
         )
+
+
+class PullWorkerTestCase(gae.testing.TestCase):
+    taskqueue_stub = {'root_path': os.path.dirname(__file__)}
+
+    def create_app(self):
+        app = flask.Flask(__name__)
+        app.register_blueprint(tq_bp)
+        return app
+
+    def setUp(self):
+        ROW_WORKER.reset_mock()
+
+    @mock.patch('google.appengine.api.taskqueue.Queue')
+    @mock.patch('google.appengine.api.taskqueue.Task', mock.call)
+    def test_push_single(self, Queue):
+        worker.push(mock.sentinel.TASK1, eta=mock.sentinel.ETA)
+
+        Queue().add.assert_called_once_with(
+            [mock.call(
+                payload=pickle.dumps(mock.sentinel.TASK1),
+                method='PULL',
+                eta=mock.sentinel.ETA)]
+        )
+
+    @mock.patch('google.appengine.api.taskqueue.Queue')
+    @mock.patch('google.appengine.api.taskqueue.Task', mock.call)
+    def test_push_multiple(self, Queue):
+        worker.push(mock.sentinel.TASK1,
+                    mock.sentinel.TASK2)
+
+        Queue().add.assert_called_once_with(
+            [mock.call(
+                payload=pickle.dumps(mock.sentinel.TASK1),
+                method='PULL'),
+             mock.call(
+                payload=pickle.dumps(mock.sentinel.TASK2),
+                method='PULL')]
+        )
+
+    @mock.patch.object(taskqueue.Queue, 'delete_tasks')
+    @mock.patch.object(taskqueue.Queue, 'lease_tasks',
+                       wraps=taskqueue.Queue('pullqueue').lease_tasks)
+    def test_pull(self, lease_tasks, delete_tasks):
+        for i in xrange(100):
+            worker.push(i)
+
+        worker._pull()
+
+        self.assertEqual(ROW_WORKER.call_args_list,
+                         [mock.call(i) for i in xrange(100)])
+
+        # We call lease_tasks 3 times because we expect there to be some
+        # afterwards
+        self.assertEqual(
+            lease_tasks.call_args_list,
+            [mock.call(123, 50), mock.call(123, 50), mock.call(123, 50)])
+
+        # but we only expect two calls to delete_tasks
+        self.assertEqual(
+            delete_tasks.call_args_list,
+            [mock.call([mock.ANY]*50), mock.call([mock.ANY]*50)])
+
+    @mock.patch.object(taskqueue.Queue, 'delete_tasks')
+    @mock.patch.object(taskqueue.Queue, 'lease_tasks')
+    def test_pull_locked(self, delete_tasks, lease_tasks):
+        queuehandler._PullWorkerLock.acquire('pullqueue')
+
+        worker._pull()
+        self.assertFalse(lease_tasks.called)
+        self.assertFalse(delete_tasks.called)
+        self.assertFalse(ROW_WORKER.called)
+
+    @mock.patch.object(queuehandler,
+                'start_new_background_thread')
+    def test_get(self, bg_thread):
+        self.client.get('/worker')
+        bg_thread.assert_called_once_with(worker._pull, ())
+
+    def test_start(self):
+        pass
+

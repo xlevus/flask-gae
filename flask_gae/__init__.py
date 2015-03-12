@@ -1,4 +1,4 @@
-from .queuehandler import pushqueue
+from .queuehandler import pushqueue, pullqueue
 from .decorators import *
 
 try:
