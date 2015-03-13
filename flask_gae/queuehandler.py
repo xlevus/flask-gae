@@ -1,3 +1,5 @@
+import time
+from datetime import timedelta
 import logging
 import cPickle as pickle
 from functools import update_wrapper
@@ -154,6 +156,7 @@ class PullQueueHandler(object):
 
     :param queue_name: Queue to push tasks to/pull tasks from
     :param module_name: Module to run the pull worker on.
+    :param tag: Tag tasks, and only pull matching tasks off the queue.
     :param lease_seconds: Time to lease tasks for.
     :param lease_size: Number of tasks to lease per pull.
 
@@ -179,12 +182,13 @@ class PullQueueHandler(object):
     #: is cPickle.
     serializer = pickle
 
-    def __init__(self, queue_name, module_name, lease_seconds=600,
+    def __init__(self, queue_name, module_name, tag=None, lease_seconds=600,
                  lease_size=100):
         self.func = None
 
         self.queue_name = queue_name
         self.module_name = module_name
+        self.tag = tag
         self.lease_seconds = lease_seconds
         self.lease_size = lease_size
 
@@ -201,18 +205,36 @@ class PullQueueHandler(object):
         return self._start()
 
     def _start(self):
-        start_new_background_thread(self._pull, ())
+        try:
+            delay = int(flask.request.args.get('delay', None))
+        except (TypeError, ValueError):
+            delay = None
+
+        start_new_background_thread(self._pull, (delay,))
         return "Started"
 
-    def _pull(self):
+    def _pull(self, delay=None):
         lock = _PullWorkerLock.acquire(self.queue.name)
         if lock is False:
             return "locked"
 
+        if delay:
+            # Simple sleep delay. Much easier doing this in the lock
+            # than using a task queue or something.
+            self.logger.debug(
+                "Waiting %s before processing",
+                timedelta(seconds=delay))
+            time.sleep(delay)
+
         try:
             while True:
-                tasks = self.queue.lease_tasks(self.lease_seconds,
-                                               self.lease_size)
+                if self.tag:
+                    tasks = self.queue.lease_tasks_by_tag(
+                        self.lease_seconds, self.lease_size, self.tag)
+                else:
+                    tasks = self.queue.lease_tasks(
+                        self.lease_seconds, self.lease_size)
+
                 self.logger.debug("Leased %i tasks.", len(tasks))
                 if len(tasks) == 0:
                     self.logger.debug("Finishing")
@@ -253,11 +275,12 @@ class PullQueueHandler(object):
         """
         tasks = [taskqueue.Task(payload=self.serializer.dumps(p),
                                 method='PULL',
+                                tag=self.tag,
                                 **task_args)
                  for p in payloads]
         self.queue.add(tasks)
 
-    def start(self, module=None, app=None):
+    def start(self, module=None, app=None, delay=None):
         """
         Attempt to start processing the pull queue.
 
@@ -266,9 +289,12 @@ class PullQueueHandler(object):
 
         :param app: The flask.Flask app to build the URL off. If unspecified
             will use the current app.
+
+        :param delay: Wait x seconds before starting to pull tasks off the
+            queue. Useful for preventing pulling singular tasks repeatedly.
         """
         with (app or flask.current_app).test_request_context():
-            path = self.url()
+            path = self.url(delay=delay)
 
         url = 'https://{module}-dot-{hostname}{path}'.format(
             module=module or self.module_name,
@@ -277,10 +303,10 @@ class PullQueueHandler(object):
 
         urlfetch.fetch(url)
 
-    def url(self):
+    def url(self, **kwargs):
         for endpoint, function in flask.current_app.view_functions.iteritems():
             if self is function:
-                return flask.url_for(endpoint)
+                return flask.url_for(endpoint, **kwargs)
         raise RuntimeError("Unable to find the endpoint name")
 
 

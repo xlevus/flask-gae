@@ -228,6 +228,9 @@ class PullWorkerTestCase(gae.testing.TestCase):
             delete_tasks.call_args_list,
             [mock.call([mock.ANY]*50), mock.call([mock.ANY]*50)])
 
+    def test_pull_tags(self):
+        pass
+
     @mock.patch.object(taskqueue.Queue, 'delete_tasks')
     @mock.patch.object(taskqueue.Queue, 'lease_tasks')
     def test_pull_locked(self, delete_tasks, lease_tasks):
@@ -238,8 +241,7 @@ class PullWorkerTestCase(gae.testing.TestCase):
         self.assertFalse(delete_tasks.called)
         self.assertFalse(ROW_WORKER.called)
 
-    @mock.patch.object(queuehandler,
-                'start_new_background_thread')
+    @mock.patch.object(queuehandler, 'start_new_background_thread')
     def test_get(self, bg_thread):
         self.client.get('/worker')
         bg_thread.assert_called_once_with(worker._pull, ())
