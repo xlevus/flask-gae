@@ -183,7 +183,7 @@ class PullQueueHandler(object):
     serializer = pickle
 
     def __init__(self, queue_name, module_name, tag=None, lease_seconds=600,
-                 lease_size=100):
+                 lease_size=100, max_workers=1):
         self.func = None
 
         self.queue_name = queue_name
@@ -191,6 +191,7 @@ class PullQueueHandler(object):
         self.tag = tag
         self.lease_seconds = lease_seconds
         self.lease_size = lease_size
+        self.max_workers = max_workers
 
     @property
     def queue(self):
@@ -214,7 +215,7 @@ class PullQueueHandler(object):
         return "Started"
 
     def _pull(self, delay=None):
-        lock = _PullWorkerLock.acquire(self.queue.name)
+        lock = _PullWorkerLock.acquire(self.queue.name, self.max_workers)
         if lock is False:
             return "locked"
 
