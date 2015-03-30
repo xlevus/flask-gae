@@ -211,10 +211,12 @@ class PullQueueHandler(object):
         except (TypeError, ValueError):
             delay = None
 
-        start_new_background_thread(self._pull, (delay,))
+        start_new_background_thread(self._pull, (
+            flask.current_app._get_current_object(),
+            delay,))
         return "Started"
 
-    def _pull(self, delay=None):
+    def _pull(self, app, delay=None):
         lock = _PullWorkerLock.acquire(self.queue.name, self.max_workers)
         if lock is False:
             return "locked"
@@ -228,33 +230,34 @@ class PullQueueHandler(object):
             time.sleep(delay)
 
         try:
-            while True:
-                if self.tag:
-                    tasks = self.queue.lease_tasks_by_tag(
-                        self.lease_seconds, self.lease_size, self.tag)
-                else:
-                    tasks = self.queue.lease_tasks(
-                        self.lease_seconds, self.lease_size)
+            with app.app_context():
+                while True:
+                    if self.tag:
+                        tasks = self.queue.lease_tasks_by_tag(
+                            self.lease_seconds, self.lease_size, self.tag)
+                    else:
+                        tasks = self.queue.lease_tasks(
+                            self.lease_seconds, self.lease_size)
 
-                self.logger.debug("Leased %i tasks.", len(tasks))
-                if len(tasks) == 0:
-                    self.logger.debug("Finishing")
-                    return
+                    self.logger.debug("Leased %i tasks.", len(tasks))
+                    if len(tasks) == 0:
+                        self.logger.debug("Finishing")
+                        return
 
-                completed = []
-                output, _ = self._deserialize(tasks)
+                    completed = []
+                    output, _ = self._deserialize(tasks)
 
-                try:
-                    for success in self.func(output):
-                        # Iter the function, and try to extend the completed
-                        # tasks
-                        try:
-                            completed.extend(success)
-                        except TypeError:
-                            # Somebody yielded a single task. Append it
-                            completed.append(success)
-                finally:
-                    self.queue.delete_tasks(completed)
+                    try:
+                        for success in self.func(output):
+                            # Iter the function, and try to extend the
+                            # completed tasks
+                            try:
+                                completed.extend(success)
+                            except TypeError:
+                                # Somebody yielded a single task. Append it
+                                completed.append(success)
+                    finally:
+                        self.queue.delete_tasks(completed)
 
         finally:
             lock.release()
@@ -312,3 +315,4 @@ class PullQueueHandler(object):
 
 
 pullqueue = PullQueueHandler
+
