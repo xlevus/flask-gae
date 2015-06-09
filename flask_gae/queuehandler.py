@@ -122,7 +122,7 @@ class _PullWorkerLock(ndb.Model):
     count = ndb.IntegerProperty(default=0)
 
     @classmethod
-    @ndb.transactional
+    @ndb.transactional(retries=5)
     def acquire(cls, id, max_workers=1):
         inst = cls.get_or_insert(id)
         if inst.count >= max_workers:
@@ -132,7 +132,7 @@ class _PullWorkerLock(ndb.Model):
         inst.put()
         return inst
 
-    @ndb.transactional
+    @ndb.transactional(retries=5)
     def release(self):
         self.count -= 1
         self.put()
@@ -219,6 +219,7 @@ class PullQueueHandler(object):
     def _pull(self, app, delay=None):
         lock = _PullWorkerLock.acquire(self.queue.name, self.max_workers)
         if lock is False:
+            logger.info("Unable to acquire lock")
             return "locked"
 
         if delay:
