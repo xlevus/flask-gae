@@ -1,4 +1,4 @@
-import warnings
+import os
 import functools
 
 import flask
@@ -7,12 +7,9 @@ from google.appengine.api import users
 from google.appengine.api import app_identity
 
 
-__all__ = ['requires', 'Cron', 'TaskQueue', 'User', 'Administrator']
+__all__ = ['requires', 'Cron', 'TaskQueue', 'User', 'Administrator',
+           'InboundApplication', 'DevAppServer']
 
-"""
-@requires(Cron)
-@requires(Cron | Administrator)
-"""
 
 def requires(test):
     """
@@ -173,4 +170,15 @@ class InboundApplication(ViewTest):
             return incoming_app_id in self.application_ids
         else:
             return incoming_app_id == app_identity.get_application_id()
+
+
+class DevAppServer(ViewTest):
+    """
+    Only allow requests in the development server.
+
+    Useful in conjunction with the `InboundApplication` test
+    as the SDK does not send `X-AppEngine-Inbound-AppId` headers.
+    """
+    def _test(self):
+        return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
