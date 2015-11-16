@@ -122,7 +122,7 @@ class _PullWorkerLock(ndb.Model):
     count = ndb.IntegerProperty(default=0)
 
     @classmethod
-    @ndb.transactional(retries=5)
+    @ndb.transactional(retries=10)
     def acquire(cls, id, max_workers=1):
         inst = cls.get_or_insert(id)
         if inst.count >= max_workers:
@@ -132,10 +132,17 @@ class _PullWorkerLock(ndb.Model):
         inst.put()
         return inst
 
-    @ndb.transactional(retries=5)
+    @ndb.transactional(retries=10)
     def release(self):
-        self.count -= 1
-        self.put()
+        # Don't use the actual instance, as another thread could have done
+        # whatever. Get a fresh copy.
+        inst = self.key.get()
+        inst.count -= 1
+        if inst.count < 0:
+            logging.warning("PulllWorkerLock count lower than 0 ?!")
+            inst.count = 0
+        inst.put()
+        return inst
 
 
 class PullQueueHandler(object):
@@ -183,7 +190,7 @@ class PullQueueHandler(object):
     serializer = pickle
 
     def __init__(self, queue_name, module_name, tag=None, lease_seconds=600,
-                 lease_size=100, max_workers=1):
+                 lease_size=100, max_workers=1, workers_per_spawn=1):
         self.func = None
 
         self.queue_name = queue_name
@@ -192,6 +199,7 @@ class PullQueueHandler(object):
         self.lease_seconds = lease_seconds
         self.lease_size = lease_size
         self.max_workers = max_workers
+        self.workers_per_spawn = workers_per_spawn
 
     @property
     def queue(self):
@@ -211,15 +219,17 @@ class PullQueueHandler(object):
         except (TypeError, ValueError):
             delay = None
 
-        start_new_background_thread(self._pull, (
-            flask.current_app._get_current_object(),
-            delay,))
-        return "Started"
+        for i in xrange(self.workers_per_spawn):
+            start_new_background_thread(self._pull, (
+                flask.current_app._get_current_object(),
+                delay,))
+
+        return "Started {} workers".format(self.workers_per_spawn)
 
     def _pull(self, app, delay=None):
         lock = _PullWorkerLock.acquire(self.queue.name, self.max_workers)
         if lock is False:
-            logger.info("Unable to acquire lock")
+            logging.info("Unable to acquire lock")
             return "locked"
 
         if delay:
